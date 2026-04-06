@@ -99,6 +99,13 @@ def get_latest_results():
                 player_cards, banker_cards = _parse_cards(sc_s)
                 winner = _parse_winner(sc_s)
 
+                # Phase du jeu : 'Prematch', 'DealerMove', 'Win1', 'Win2', 'Tie', etc.
+                phase = None
+                for entry in sc_s:
+                    if entry.get("Key") == "S":
+                        phase = entry.get("Value")
+                        break
+
                 def fmt_cards(cards):
                     return [{"S": SUIT_MAP.get(c.get("S"), "?"), "R": c.get("R", "?"), "raw": c.get("S", -1)} for c in cards]
 
@@ -108,6 +115,7 @@ def get_latest_results():
                     "banker_cards": fmt_cards(banker_cards),
                     "winner": winner,
                     "is_finished": is_finished,
+                    "phase": phase,
                     "score": sc.get("FS", {}),
                 }
                 results.append(result)

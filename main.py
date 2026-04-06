@@ -26,6 +26,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
 if not API_ID or API_ID == 0:
     logger.error("API_ID manquant")
     exit(1)
@@ -56,6 +57,7 @@ MAX_SILENT_HISTORY = 150
 
 api_results_cache: Dict[int, dict] = {}
 player_processed_games: set = set()
+player_cards_seen_count: Dict[int, int] = {}   # game_number → nb cartes joueur au poll précédent
 last_prediction_game: int = 0
 reset_done_for_cycle: bool = False
 
@@ -890,7 +892,7 @@ async def process_compteur3(game_number: int, player_suits: List[str]):
 
 async def api_polling_loop():
     global current_game_number, api_results_cache, player_processed_games
-    global reset_done_for_cycle
+    global player_cards_seen_count, reset_done_for_cycle
 
     loop = asyncio.get_event_loop()
     logger.info(f"🔄 Polling API dynamique démarré (intervalle: {API_POLL_INTERVAL}s)")
@@ -904,13 +906,23 @@ async def api_polling_loop():
                     game_number = result["game_number"]
                     is_finished = result["is_finished"]
                     player_cards = result.get("player_cards", [])
+                    phase = result.get("phase")
 
                     api_results_cache[game_number] = result
 
                     player_suits = player_suits_from_cards(player_cards)
-                    ready = len(player_cards) >= 2
 
-                    if not ready:
+                    if len(player_cards) < 2:
+                        continue
+
+                    # Détection directe via le champ phase de l'API :
+                    # 'DealerMove' = banquier joue → joueur a FINI ses cartes
+                    # 'Win1'/'Win2'/'Tie' = partie terminée → joueur FINI
+                    # 'Prematch' ou None = pas encore commencé / joueur tire encore
+                    PLAYER_DONE_PHASES = ("DealerMove", "Win1", "Win2", "Tie")
+                    player_done = phase in PLAYER_DONE_PHASES or is_finished
+
+                    if not player_done:
                         continue
 
                     current_game_number = game_number
@@ -925,15 +937,14 @@ async def api_polling_loop():
                     await check_silent_result_c2(game_number, player_suits, is_finished)
                     await check_silent_result_c3(game_number, player_suits, is_finished)
 
-                    # 3. Traitement des compteurs dès que joueur a ses cartes
-                    if game_number not in player_processed_games and ready:
+                    # 3. Traitement des compteurs dès que le joueur a fini (banquier ne compte pas)
+                    if game_number not in player_processed_games and player_done:
                         player_processed_games.add(game_number)
                         if len(player_processed_games) > 500:
                             player_processed_games.discard(min(player_processed_games))
 
                         logger.info(
-                            f"🃏 Jeu #{game_number} | Joueur: {p_display} "
-                            f"| Terminé: {is_finished}"
+                            f"🃏 Jeu #{game_number} TERMINÉ | Joueur: {p_display}"
                         )
                         await process_compteur1(game_number, player_suits)
                         await process_compteur2(game_number, player_suits)
@@ -965,7 +976,7 @@ async def api_polling_loop():
 
 async def perform_full_reset(reason: str):
     global pending_predictions, last_prediction_time, last_prediction_game
-    global player_processed_games, api_results_cache, reset_done_for_cycle
+    global player_processed_games, player_cards_seen_count, api_results_cache, reset_done_for_cycle
     global c1_absences, c1_last_seen, c1_processed_games, c1_consec_losses, c1_pending_silent
     global c2_absences, c2_last_seen, c2_processed_games, c2_had_first_loss, c2_pending_silent
     global c3_absences, c3_last_seen, c3_processed_games, c3_consec_losses, c3_pending_silent
@@ -975,6 +986,7 @@ async def perform_full_reset(reason: str):
     last_prediction_time = None
     last_prediction_game = 0
     player_processed_games = set()
+    player_cards_seen_count = {}
     api_results_cache = {}
 
     c1_absences = {suit: 0 for suit in ALL_SUITS}
