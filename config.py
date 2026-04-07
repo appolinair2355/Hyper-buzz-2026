@@ -21,8 +21,8 @@ API_POLL_INTERVAL = int(os.getenv("API_POLL_INTERVAL", "5"))
 
 # Canaux silencieux dédiés par compteur
 C1_SILENT_CHANNEL_ID = parse_channel_id(os.getenv("C1_SILENT_CHANNEL_ID", "-1003651435888"))
-C2_SILENT_CHANNEL_ID = parse_channel_id(os.getenv("C2_SILENT_CHANNEL_ID", "-1003430118891"))
-C3_SILENT_CHANNEL_ID = parse_channel_id(os.getenv("C3_SILENT_CHANNEL_ID", "-1003341134749"))
+C2_SILENT_CHANNEL_ID = parse_channel_id(os.getenv("C2_SILENT_CHANNEL_ID", "-1003771722446"))
+C3_SILENT_CHANNEL_ID = parse_channel_id(os.getenv("C3_SILENT_CHANNEL_ID", "-1003388299564"))
 
 # Canal double (escalade après seuil de pertes)
 DOUBLE_CANAL_CHANNEL_ID = parse_channel_id(os.getenv("DOUBLE_CANAL_CHANNEL_ID", "-1003707419910"))
